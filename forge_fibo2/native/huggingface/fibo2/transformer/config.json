@@ -1,0 +1,19 @@
+{
+  "_class_name": "Fibo2Transformer2DModel",
+  "_diffusers_version": "0.38.0",
+  "in_channels": 128,
+  "dim": 3584,
+  "n_heads": 28,
+  "n_layers": 44,
+  "n_refiner_layers": 2,
+  "injection_layers": [6, 14, 22, 30, 38],
+  "cap_feat_dim": 7680,
+  "perceiver_layers": 2,
+  "max_gist_tokens": 512,
+  "ffn_dim": 9728,
+  "norm_eps": 1e-05,
+  "axes_dim": [32, 48, 48],
+  "theta": 256.0,
+  "text_encoder_layers": [9, 20, 31, 5, 16, 27, 7, 18, 29, 9, 20, 31, 11, 22, 33, 13, 24, 35],
+  "shift": 1.15
+}

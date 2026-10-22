@@ -1,0 +1,134 @@
+"""The prompt as FIBO 2.0 reads it, and the pictures Qwen3-VL sees (caption.py)."""
+
+import json
+
+import torch
+
+from forge_fibo2.native import caption, phases
+
+MARKER = caption.VISION_MARKER
+
+
+def chat_body(chat):
+    assert chat.startswith("<|im_start|>user\n") and chat.endswith("<|im_end|>\n<|im_start|>assistant\n")
+    return chat[len("<|im_start|>user\n"): -len("<|im_end|>\n<|im_start|>assistant\n")]
+
+
+def test_empty_prompt_is_the_null_caption():
+    assert caption.build("") == (caption.NULL_CAPTION, [])
+    assert caption.build("   \n") == (caption.NULL_CAPTION, [])
+    assert json.loads(chat_body(caption.NULL_CAPTION))["objects"] == []
+
+
+def test_plain_text_goes_in_as_written():
+    chat, texts = caption.build("a red fox in the snow, {not json}")
+    assert chat_body(chat) == "a red fox in the snow, {not json}"
+    assert texts == []
+
+
+def test_json_caption_is_cleaned_and_compacted():
+    prompt = json.dumps({
+        "short_description": "A fox",
+        "objects": [{"description": "fox", "pose": "", "aesthetic_score": 9}, {}],
+        "lighting": {"conditions": "dusk", "direction": None},
+        "aesthetics": {"composition": "centered", "preference_score": 0.8},
+        "aesthetic_score": 7,
+        "context": "",
+        "artistic_style": "naturalistic",
+    }, indent=2)
+    body = chat_body(caption.build(prompt)[0])
+    assert body == ('{"short_description":"A fox","objects":[{"description":"fox","aesthetic_score":9}],'
+                    '"lighting":{"conditions":"dusk"},"aesthetics":{"composition":"centered"},'
+                    '"artistic_style":"naturalistic"}')
+
+
+def test_short_description_and_empty_text_render_keep_both():
+    body = chat_body(caption.build('{"short_description": "A wall", "text_render": []}')[0])
+    assert body == '{"short_description":"A wall","text_render":[]}'
+
+
+def test_text_render_entries_get_their_pictures():
+    prompt = json.dumps({"short_description": "A sign", "text_render": [
+        {"text": "OPEN 24H", "location": "center"}, {"text": ""}, {"location": "top"}, {"text": "Café"}]})
+    chat, texts = caption.build(prompt)
+    body = json.loads(chat_body(chat))
+    assert texts == ["OPEN 24H", "Café"]
+    # the cleaning drops the entry whose only field is empty; the one without text gets no picture
+    assert [e.get("image_tokens") for e in body["text_render"]] == [MARKER, None, MARKER]
+    # the caption a generation starts from: the same entries, their markers empty, no pictures
+    chat, texts = caption.build(prompt, text_images=False)
+    assert texts == []
+    assert [e.get("image_tokens") for e in json.loads(chat_body(chat))["text_render"]] == ["", None, ""]
+
+
+def test_edit_wraps_the_instruction():
+    body = json.loads(chat_body(caption.build("make it night", edit_images=1)[0]))
+    assert body == {"image": MARKER, "edit_instruction": "make it night"}
+    body = json.loads(chat_body(caption.build("swap <image_1> and <image_2>", edit_images=2)[0]))
+    assert body == {"image_1": MARKER, "image_2": MARKER, "edit_instruction": "swap <image_1> and <image_2>"}
+
+
+def test_edit_with_a_caption_of_the_result():
+    prompt = json.dumps({"edit_instruction": "add a sign", "short_description": "A shop",
+                         "text_render": [{"text": "SALE"}]})
+    chat, texts = caption.build(prompt, edit_images=1)
+    assert texts == ["SALE"]
+    assert json.loads(chat_body(chat)) == {
+        "image": MARKER, "structured_caption": {"short_description": "A shop",
+                                                "text_render": [{"text": "SALE", "image_tokens": MARKER}]},
+        "edit_instruction": "add a sign"}
+    # the image markers come first: the images to edit, then the text pictures, in the token order
+    assert chat.index(MARKER) < chat.index('"text_render"')
+
+
+def test_trained_sizes():
+    assert caption.trained_size(1.0) == (1024, 1024)
+    assert caption.trained_size(16 / 9) == (1424, 800)
+    assert caption.trained_size(9 / 16) == (800, 1424)
+
+
+def test_text_picture():
+    picture = caption.draw_text_image("Hello   world", caption.font())
+    assert picture.shape[0] == 1 and picture.shape[-1] == 3
+    assert picture.max() == 1.0 and picture.min() < 0.5  # black text on white
+    assert caption.to_qwen_grid(picture).shape[1] % 32 == 0
+
+
+def test_qwen_grid_and_thumbnail():
+    image = torch.rand(1, 1000, 1500, 3)
+    thumb = caption.thumbnail(image)
+    assert thumb.shape == (1, 512, 768, 3)
+    grid = caption.to_qwen_grid(thumb)
+    assert grid.shape == (1, 512, 768, 3)
+    # 8-bit values, as the processor's
+    assert torch.equal(grid, (grid * 255).round() / 255)
+    assert caption.to_qwen_grid(torch.rand(1, 10, 10, 3)).shape == (1, 64, 64, 3)
+
+
+def test_edit_images_sizes():
+    one = caption.edit_images([torch.rand(1, 600, 1000, 4)])
+    assert one[0].shape == (1, 592, 992, 3)
+    same = torch.rand(1, 512, 768, 3)
+    assert torch.equal(caption.edit_images([same])[0], same)
+    # several images: each to its trained size (5:3 -> 1360 x 816, about 1.1 MP)
+    two = caption.edit_images([torch.rand(1, 600, 1000, 3), torch.rand(1, 900, 900, 3)])
+    assert [tuple(i.shape) for i in two] == [(1, 816, 1360, 3), (1, 1024, 1024, 3)]
+
+
+def test_fit_crops_the_center():
+    image = torch.zeros(1, 100, 300, 3)
+    image[:, :, 100:200] = 1.0
+    out = caption.fit(image, 64, 64)
+    assert out.shape == (1, 64, 64, 3)
+    assert out.mean() > 0.95
+
+
+def test_phases_pack_and_split():
+    early, late = torch.full((2, 3), 1.0), torch.full((4, 3), 2.0)
+    packed = phases.pack(late, early)
+    assert packed.shape == (6, 4)
+    assert phases.split(packed[None], 0.95)[0].tolist() == early.tolist()
+    assert phases.split(packed[None], 0.9)[0].tolist() == late.tolist()
+    single = phases.pack(late)
+    for sigma in (1.0, 0.5):
+        assert phases.split(single[None], sigma)[0].tolist() == late.tolist()

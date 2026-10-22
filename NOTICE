@@ -1,0 +1,23 @@
+FIBO 2 for Forge Neo
+Copyright 2026 eduardoabreu81
+
+This extension is licensed under the GNU Affero General Public License v3.0 (see LICENSE).
+
+It contains code ported from projects licensed under the GNU General Public License v3.0 and the Apache License,
+Version 2.0 (see LICENSE-APACHE); their notices follow.
+
+forge_fibo2/native/transformer.py, caption.py, text_engine.py and phases.py are ported from ComfyUI's Fibo 2.0
+support (https://github.com/Comfy-Org/ComfyUI, commit 87ed5a0, pull request #17240: comfy/ldm/fibo2/model.py,
+comfy/text_encoders/fibo2.py, comfy_extras/nodes_fibo2.py, with the pieces they import from comfy/ldm/lumina,
+comfy/ldm/flux and comfy/ldm/modules), GNU General Public License v3.0. tests/reference/fibo2_comfy.py is a
+transcription of that DiT without the ComfyUI framework, used only by the tests.
+
+forge_fibo2/native/huggingface/fibo2/tokenizer/ holds the Qwen2 tokenizer files (Qwen Team, Apache License 2.0);
+text_encoder/config.json restates the Qwen3-VL 4B configuration; vae/config.json is the FLUX.2 autoencoder
+configuration as Forge Neo ships it; transformer/config.json restates the FIBO 2.0 configuration.
+
+No code of Bria's reference pipeline (CC BY-NC 4.0) is part of this extension.
+
+The FIBO 2.0 weights are not part of this extension. They are (c) BRIA AI and licensed under Creative Commons
+Attribution-NonCommercial 4.0 International (https://huggingface.co/briaai/Fibo-2.0-dev,
+https://huggingface.co/Comfy-Org/Fibo-2.0): non-commercial use only; commercial use needs an agreement with BRIA AI.

@@ -1,0 +1,24 @@
+{
+  "_class_name": "Fibo2Pipeline",
+  "_diffusers_version": "0.38.0",
+  "scheduler": [
+    "diffusers",
+    "FlowMatchEulerDiscreteScheduler"
+  ],
+  "text_encoder": [
+    "transformers",
+    "Qwen3VLModel"
+  ],
+  "tokenizer": [
+    "transformers",
+    "Qwen2Tokenizer"
+  ],
+  "transformer": [
+    "diffusers",
+    "Fibo2Transformer2DModel"
+  ],
+  "vae": [
+    "diffusers",
+    "AutoencoderKLFlux2"
+  ]
+}

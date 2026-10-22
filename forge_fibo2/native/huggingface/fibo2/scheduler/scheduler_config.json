@@ -1,0 +1,13 @@
+{
+  "_class_name": "FlowMatchEulerDiscreteScheduler",
+  "_diffusers_version": "0.38.0",
+  "num_train_timesteps": 1000,
+  "shift": 1.15,
+  "use_dynamic_shifting": false,
+  "time_shift_type": "exponential",
+  "invert_sigmas": false,
+  "stochastic_sampling": false,
+  "use_beta_sigmas": false,
+  "use_exponential_sigmas": false,
+  "use_karras_sigmas": false
+}
