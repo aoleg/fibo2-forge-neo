@@ -144,14 +144,29 @@ def to_qwen_grid(image):
     return resize_8bit(image, height, width)
 
 
-def trained_size(aspect_ratio):
+def trained_size(aspect_ratio, step=16):
     """Bria's (width, height) for an aspect ratio: of the multiples of 16 within 10% of 1 MP, the least cropping,
-    then the closest to 1 MP."""
+    then the closest to 1 MP. Another step gives the same choice among its multiples (Forge's Resolution Step)."""
     area = 1024 * 1024
-    sizes = [(w, h) for w in range(64, 2 * area // 64, 16)
-             for h in range(max(64, 16 * math.ceil(0.9 * area / w / 16)), 16 * math.floor(1.1 * area / w / 16) + 1, 16)]
-    return min(sizes, key=lambda s: (round(1 - min(s[0] / s[1] / aspect_ratio, aspect_ratio * s[1] / s[0]), 9),
-                                     abs(s[0] * s[1] - area), -s[0]))
+    sizes = [(w, h) for w in range(64, 2 * area // 64, step)
+             for h in range(max(64, step * math.ceil(0.9 * area / w / step)), step * math.floor(1.1 * area / w / step) + 1,
+                            step)]
+    return min(sizes, key=lambda s: (crop(s[0] / s[1], aspect_ratio), abs(s[0] * s[1] - area), -s[0]))
+
+
+def crop(aspect_ratio, other):
+    # the share of a picture of one aspect ratio cropped away to fit the other
+    return round(1 - min(aspect_ratio / other, other / aspect_ratio), 9)
+
+
+def size_advice(picture, size, step=16):
+    """A better (width, height) for editing a picture of size (width, height) into a result of size, or None when
+    size is fine: about 1 MP (within 10%) and the picture's proportions (within 5%), as Edit Turbo was trained.
+    Elsewhere edits tend to zoom in on what changes, or lose detail."""
+    aspect_ratio = picture[0] / picture[1]
+    if 0.9 <= size[0] * size[1] / (1024 * 1024) <= 1.1 and crop(size[0] / size[1], aspect_ratio) <= 0.05:
+        return None
+    return trained_size(aspect_ratio, step)
 
 
 def fit(image, width, height):
@@ -176,7 +191,8 @@ def fit(image, width, height):
 
 def edit_images(images, width=None, height=None):
     """The images to edit at the sizes upstream gives them: a single one scaled and center cropped to the result's
-    size (multiples of 16), since the edit lines up with it pixel for pixel; several, each to its own trained size."""
+    size, width x height (multiples of 16; its own size when not given), since the edit lines up with it pixel for
+    pixel; several, each to its own trained size."""
     images = [image[..., :3] for image in images]
     if len(images) == 1:
         h, w = images[0].shape[1], images[0].shape[2]
