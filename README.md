@@ -151,7 +151,7 @@ The shift follows the picture's size, as in Bria's pipeline: 1.15 at 1024x1024, 
 
 - Long, detailed captions are what the model knows best; a language model can turn a sentence into a VGL caption
 - FIBO 2.0 does not know characters by name - "Hatsune Miku" gives an unrelated girl with the name written on the screens - but describe her (long turquoise twin tails, grey top with a turquoise tie, headset microphone...) and she comes out right
-- For edits, use **Crop and resize** in img2img so the picture keeps its proportions
+- For edits, use **Crop and resize** in img2img and set its size to about 1 megapixel in the picture's proportions (1024x1024 for a square picture, 1216x896 for a 4:3 one); at other sizes edits can zoom in on what changes or lose detail, and the console says which size to use
 - New text encoder files appear in the list after a restart of Forge Neo
 - Before uninstalling, switch the UI preset to another one
 

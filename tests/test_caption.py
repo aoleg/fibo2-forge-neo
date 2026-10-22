@@ -126,9 +126,27 @@ def test_qwen_grid_and_thumbnail():
     assert caption.to_qwen_grid(torch.rand(1, 10, 10, 3)).shape == (1, 64, 64, 3)
 
 
+def test_trained_sizes_on_another_step():
+    width, height = caption.trained_size(4 / 3, 64)
+    assert width % 64 == 0 and height % 64 == 0
+    assert 0.9 <= width * height / 2 ** 20 <= 1.1
+
+
+def test_size_advice():
+    # about 1 MP in the picture's proportions: fine
+    assert caption.size_advice((1600, 1200), (1184, 880)) is None
+    assert caption.size_advice((1024, 1024), (1024, 1024)) is None
+    # a 4:3 picture into a square result, or a small one: the trained size for 4:3
+    assert caption.size_advice((1600, 1200), (1024, 1024)) == caption.trained_size(4 / 3)
+    assert caption.size_advice((1024, 1024), (512, 512)) == (1024, 1024)
+    assert caption.size_advice((1600, 1200), (512, 512), 64) == caption.trained_size(4 / 3, 64)
+
+
 def test_edit_images_sizes():
     one = caption.edit_images([torch.rand(1, 600, 1000, 4)])
     assert one[0].shape == (1, 592, 992, 3)
+    # a single image is cropped to the result's size
+    assert caption.edit_images([torch.rand(1, 600, 1000, 3)], 1024, 1024)[0].shape == (1, 1024, 1024, 3)
     same = torch.rand(1, 512, 768, 3)
     assert torch.equal(caption.edit_images([same])[0], same)
     # several images: each to its trained size (5:3 -> 1360 x 816, about 1.1 MP)
