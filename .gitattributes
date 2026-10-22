@@ -9,3 +9,5 @@ LICENSE text eol=lf
 *.mp4 binary
 *.jpg binary
 *.png binary
+*.otf binary
+*.ttf binary

@@ -5,7 +5,8 @@
 #
 # A prompt is a structured JSON caption (Bria's VGL) or plain text. The caption is cleaned as in training (empty
 # fields and scores dropped) and re-serialized compactly. Each text_render entry gets a marker where Qwen3-VL sees a
-# picture of its text, drawn black on white. An edit wraps the caption, or the plain text as the instruction, in
+# picture of its text, drawn black on white (text_images.py). An edit wraps the caption, or the plain text as the
+# instruction, in
 # {"image": <marker>, ..., "structured_caption": ..., "edit_instruction": ...}. An empty prompt is the null caption
 # training used for classifier-free guidance.
 #
@@ -17,6 +18,8 @@ import math
 import numpy as np
 import torch
 
+from . import text_images
+
 VISION_MARKER = "<|vision_start|><|image_pad|><|vision_end|>"
 TEMPLATE = "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
 # the null caption, a whole chat turn, taken as it is (no cleaning, no template)
@@ -26,9 +29,6 @@ NULL_CAPTION = TEMPLATE.format('{"short_description":"","objects":[],"background
 SCORES = ("aesthetic_score", "preference_score")
 # Qwen3-VL sees each image to edit at most this many pixels a side, as in training
 THUMBNAIL = 768
-FONT_SIZE = 20
-
-_font = None
 
 
 def dumps(value):
@@ -112,53 +112,9 @@ def has_text_render(prompt: str) -> bool:
 # pictures: (1, H, W, 3) float tensors in [0, 1], as ComfyUI's images
 
 
-def font():
-    global _font
-    if _font is None:
-        from PIL import ImageFont
-
-        _font = ImageFont.load_default(FONT_SIZE)
-    return _font
-
-
-def has_glyph(font, notdef, character):
-    # a font without the glyph draws its notdef box, the one it draws for U+FFFE, which no font has
-    try:
-        mask = font.getmask(character)
-    except (OSError, ValueError):  # as in training, a font that can't say is taken to have the glyph
-        return True
-    return not (mask.size == notdef.size and bytes(mask) == bytes(notdef))
-
-
-def draw_text_image(text, font):
-    """Pillow's built-in font, black on white, whitespace collapsed, split every 256 characters (training's non-ASCII
-    fallback fonts aren't shipped)."""
-    from PIL import Image, ImageDraw
-
-    line = " ".join(text.split())
-    lines = [line[i:i + 256] for i in range(0, len(line), 256)] or [""]
-    notdef = font.getmask(chr(0xFFFE))
-    if all(ord(c) < 128 or has_glyph(font, notdef, c) for c in set(line)):
-        # each line placed by its bounding box, at least as tall as "Ag"
-        min_box = font.getbbox("Ag")
-        boxes = [font.getbbox(line or " ") for line in lines]
-        heights = [max(1, min_box[3] - min_box[1], box[3] - box[1]) for box in boxes]
-        width = max([1] + [box[2] - box[0] for box in boxes])
-        origins, anchor = [(2 - box[0], -box[1]) for box in boxes], None
-    else:
-        # a character the font lacks (drawn as its notdef box) puts every line on the baseline, as tall as the font
-        ascent, descent = font.getmetrics()
-        lines = [line or " " for line in lines]
-        heights = [max(1, ascent + descent)] * len(lines)
-        width = max(max(1, round(font.getlength(line))) for line in lines)
-        origins, anchor = [(2.0, ascent)] * len(lines), "ls"
-
-    image = Image.new("RGB", (width + 4, sum(heights) + 4 * len(lines)), "white")
-    draw = ImageDraw.Draw(image)
-    y = 2
-    for line, (x, dy), height in zip(lines, origins, heights):
-        draw.text((x, y + dy), line, font=font, fill=(0, 0, 0), anchor=anchor)
-        y += height + 4
+def text_picture(text: str) -> torch.Tensor:
+    """The picture of a text_render text, drawn as training drew it (text_images.py)."""
+    image = text_images.draw_text_image(text)
     return torch.from_numpy(np.array(image)).float().div(255.0).unsqueeze(0)
 
 

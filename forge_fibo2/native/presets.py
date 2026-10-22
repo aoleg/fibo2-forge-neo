@@ -1,18 +1,19 @@
 # FIBO 2 support for Forge Neo
-# The "fibo2" (Dev) and "fibo2_turbo" (Edit Turbo) UI presets, added at runtime: PresetArch gains a member each and
-# their options are registered through Forge Neo's own presets.register, so they match every other preset. Same
-# mechanism as the FLUX 3 extension; each preset keeps its own checkpoint, as Forge's presets do.
+# A "fibo2" UI preset, added at runtime: PresetArch gains a member and the preset's options are registered through
+# Forge Neo's own presets.register, so they match every other preset. Same mechanism as the FLUX 3 extension.
 
 from enum import Enum
 
 from modules_forge import presets
 
-# upstream's settings (ComfyUI's PR and workflows): Euler with the Simple schedule; Dev 30 steps at CFG 5, the
-# guidance-free Edit Turbo 4 steps
-PRESETS = {
-    "fibo2": ("Euler", "Simple", 30, 5.0),
-    "fibo2_turbo": ("Euler", "Simple", 4, 1.0),
-}
+PRESET = "fibo2"
+
+# Dev's settings in Bria's model card: 50 steps at CFG 5, Euler with the Simple schedule (the reference pipeline's
+# sigmas). Edit Turbo, and Dev with the turbo LoRA, want 4 steps at CFG 1, set by hand
+SAMPLER = "Euler"
+SCHEDULER = "Simple"
+STEPS = 50
+CFG = 5.0
 
 
 def _add_enum_member(enum_cls: type[Enum], name: str) -> Enum:
@@ -37,16 +38,16 @@ def _add_enum_member(enum_cls: type[Enum], name: str) -> Enum:
 
 
 def _is_preset_option(key: str) -> bool:
-    return any(key.startswith(f"{name}_") or key.endswith(f"_{name}") for name in PRESETS)
+    return key.startswith(f"{PRESET}_") or key.endswith(f"_{PRESET}")
 
 
 def register() -> None:
-    for name, (sampler, scheduler, steps, cfg) in PRESETS.items():
-        arch = _add_enum_member(presets.PresetArch, name)
-        presets.SAMPLERS[arch] = sampler
-        presets.SCHEDULERS[arch] = scheduler
-        presets.STEPS[arch] = steps
-        presets.CFG[arch] = cfg
+    arch = _add_enum_member(presets.PresetArch, PRESET)
+
+    presets.SAMPLERS[arch] = SAMPLER
+    presets.SCHEDULERS[arch] = SCHEDULER
+    presets.STEPS[arch] = STEPS
+    presets.CFG[arch] = CFG
 
     from modules import shared
 

@@ -12,11 +12,21 @@ comfy/text_encoders/fibo2.py, comfy_extras/nodes_fibo2.py, with the pieces they 
 comfy/ldm/flux and comfy/ldm/modules), GNU General Public License v3.0. tests/reference/fibo2_comfy.py is a
 transcription of that DiT without the ComfyUI framework, used only by the tests.
 
+forge_fibo2/native/text_images.py, shift.py and masking.py are ported from diffusers' Fibo 2.0 pipeline
+(https://github.com/huggingface/diffusers, commit de988b7, pull request #14991: src/diffusers/pipelines/bria_fibo2/
+text_images.py, pipeline_bria_fibo2.py and image_processor.py), Copyright 2026 Bria AI and The HuggingFace Team,
+Apache License 2.0.
+
+forge_fibo2/native/fonts/ holds the fallback fonts Fibo 2.0's training drew its text pictures with, as Bria ships
+them (https://huggingface.co/briaai/Fibo-2.0-dev, fonts/): Aileron-Regular.otf, Aileron Regular 1.102 by Sora Sagano
+(dot colon), CC0 1.0 (LICENSE-Aileron.txt); DejaVuSans.ttf, DejaVu Sans 2.37, Bitstream Vera Fonts License with the
+DejaVu changes in the public domain (LICENSE-DejaVu.txt).
+
 forge_fibo2/native/huggingface/fibo2/tokenizer/ holds the Qwen2 tokenizer files (Qwen Team, Apache License 2.0);
 text_encoder/config.json restates the Qwen3-VL 4B configuration; vae/config.json is the FLUX.2 autoencoder
 configuration as Forge Neo ships it; transformer/config.json restates the FIBO 2.0 configuration.
 
-No code of Bria's reference pipeline (CC BY-NC 4.0) is part of this extension.
+No code of Bria's CC BY-NC 4.0 releases is part of this extension.
 
 The FIBO 2.0 weights are not part of this extension. They are (c) BRIA AI and licensed under Creative Commons
 Attribution-NonCommercial 4.0 International (https://huggingface.co/briaai/Fibo-2.0-dev,

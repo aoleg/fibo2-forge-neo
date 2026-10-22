@@ -134,7 +134,7 @@ def apply() -> None:
         presets.register()
     except Exception as e:
         # the model still works: Euler, Simple, 30 steps at CFG 5 (Dev) or 4 at CFG 1 (Edit Turbo) by hand
-        logger.warning(f"[FIBO 2] could not add the fibo2 UI presets: {e}")
+        logger.warning(f"[FIBO 2] could not add the fibo2 UI preset: {e}")
 
     _applied = True
     print(f"[FIBO 2] native backend enabled (torch {torch.__version__})")

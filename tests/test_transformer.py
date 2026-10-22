@@ -67,6 +67,18 @@ def test_matches_comfyui_unfused_and_long_text():
     torch.testing.assert_close(ours.run(x, sigma, context), upstream(x, sigma, context), rtol=1e-4, atol=1e-5)
 
 
+@torch.no_grad()
+def test_norms_apply_forge_on_the_fly_patches():
+    # Forge's online LoRA (GGUF models) appends weight patches to weight_function, one list per module
+    norm = transformer.RMSNorm(8, 1e-5)
+    other = transformer.RMSNorm(8, 1e-5)
+    x = torch.randn(2, 8)
+    plain = norm(x)
+    norm.weight_function.append(lambda w: w * 2.0)
+    torch.testing.assert_close(norm(x), plain * 2.0)
+    assert other.weight_function == [] and other.bias_function == []
+
+
 def test_gist_count():
     assert transformer.gist_count(10, 512) == 256
     assert transformer.gist_count(256, 512) == 256

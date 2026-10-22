@@ -15,8 +15,9 @@ from backend.patcher.clip import CLIP
 from backend.patcher.unet import UnetPatcher
 from backend.patcher.vae import VAE
 
-from . import caption, lora, settings
+from . import caption, lora, masking, settings
 from .model import TEXT_ENCODER, Fibo2
+from .shift import dynamic_shift as shift_of
 from .text_engine import Fibo2TextEngine
 
 # the loader's model flags, set from substrings of the checkpoint path and of the configuration folder's path; none
@@ -71,6 +72,10 @@ class Fibo2Engine(ForgeDiffusionEngine):
             return self.text_engine_fibo2(prompt)
 
         images = caption.edit_images(images)
+        mask = masking.current()
+        if mask is not None and len(images) == 1:
+            # a masked edit: as upstream, of one picture only, its masked region greyed out for Qwen3-VL and the VAE
+            images = [masking.grey_out(images[0], mask)]
         conds = self.text_engine_fibo2(prompt, images=images)
         dynamic_args.ref_latents = [self.encode_reference(image) for image in images]
         return conds
@@ -80,6 +85,14 @@ class Fibo2Engine(ForgeDiffusionEngine):
         """(1, H, W, 3) in [0, 1] -> its latent (1, 128, H / 16, W / 16), as Forge encodes an img2img image."""
         x = image.movedim(-1, 1).mul(2.0).sub(1.0)
         return ForgeDiffusionEngine.encode_first_stage(self, x).cpu()
+
+    def set_shift(self, shift: float = None, width: int = 1024, height: int = 1024, *args, **kwargs):
+        # Forge calls this before every sampling pass (hires fix too) with its size; Forge's Qwen-Image 2.1 engine
+        # sets its shift from the size the same way. No Shift slider: FIBO 2's shift is the reference pipeline's,
+        # from the size (shift.py)
+        mu = shift_of(width, height)
+        self.forge_objects.unet.model.predictor.set_parameters(shift=mu)
+        memory_management.logger.debug(f"[FIBO 2] shift {mu:.4f} for {width}x{height}")
 
     @torch.inference_mode()
     def get_prompt_lengths_on_ui(self, prompt: str) -> tuple[int, int]:

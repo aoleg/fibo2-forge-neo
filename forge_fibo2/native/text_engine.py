@@ -13,7 +13,7 @@ from backend.args import dynamic_args
 from backend.text_processing import emphasis
 from backend.text_processing._comfy import INF, SDClipModel, SDTokenizer
 
-from . import caption, phases
+from . import caption, phases, vgl
 
 PAD = 151643  # <|endoftext|>: never part of a prompt, so Forge's end-of-text masking never cuts one
 IMAGE_PAD = 151655  # <|image_pad|>, where a picture goes
@@ -39,11 +39,15 @@ class Fibo2TextEngine:
     def token_ids(self, chat: str) -> list[int]:
         return self.tokenizer.tokenizer.encode(chat, add_special_tokens=False)
 
-    def tokenize(self, texts: str | list[str]) -> int | list[int]:
+    @staticmethod
+    def prompt(line: str) -> str:
         # surrounding whitespace is dropped (as Forge's Krea 2 engine does): "", " " and a prompt left with only LoRA
-        # tags are all the null caption
+        # tags are all the null caption. A caption whose braces sd-dynamic-prompts stripped is rebuilt (vgl.py)
+        return vgl.restore_caption_json(line.strip())
+
+    def tokenize(self, texts: str | list[str]) -> int | list[int]:
         if isinstance(texts, str):
-            return len(self.token_ids(caption.build(texts.strip())[0]))
+            return len(self.token_ids(caption.build(self.prompt(texts))[0]))
         return [self.tokenize(t) for t in texts]
 
     def __call__(self, texts: list[str], images: list[torch.Tensor] = ()) -> list[torch.Tensor]:
@@ -61,7 +65,7 @@ class Fibo2TextEngine:
     def encode(self, line: str, images: list[torch.Tensor] = ()) -> torch.Tensor:
         """(T, 46080 + 1): the conditioning and its phase marker. images are the pictures to edit, (1, H, W, 3) in
         [0, 1] at their final size."""
-        prompt = line.strip()
+        prompt = self.prompt(line)
         states = self.states(prompt, images, text_images=True)
         if len(images) == 0 and prompt and caption.build(prompt)[1]:
             # a generation starts from the caption without the text pictures, as upstream does
@@ -71,7 +75,7 @@ class Fibo2TextEngine:
     def states(self, prompt: str, images, text_images: bool) -> torch.Tensor:
         chat, texts = caption.build(prompt, len(images), text_images)
         pictures = [caption.thumbnail(image) for image in images]
-        pictures += [caption.draw_text_image(text, caption.font()) for text in texts]
+        pictures += [caption.text_picture(text) for text in texts]
         pictures = iter([caption.to_qwen_grid(picture) for picture in pictures])
 
         pairs = []

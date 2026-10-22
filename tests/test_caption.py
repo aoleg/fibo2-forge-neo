@@ -4,7 +4,7 @@ import json
 
 import torch
 
-from forge_fibo2.native import caption, phases
+from forge_fibo2.native import caption, phases, text_images
 
 MARKER = caption.VISION_MARKER
 
@@ -88,10 +88,31 @@ def test_trained_sizes():
 
 
 def test_text_picture():
-    picture = caption.draw_text_image("Hello   world", caption.font())
+    picture = caption.text_picture("Hello   world")
     assert picture.shape[0] == 1 and picture.shape[-1] == 3
     assert picture.max() == 1.0 and picture.min() < 0.5  # black text on white
     assert caption.to_qwen_grid(picture).shape[1] % 32 == 0
+
+
+def test_accents_come_from_the_fallback_fonts():
+    font = text_images.default_font()
+    aileron, dejavu = text_images.fallback_fonts()
+    # Pillow's built-in font has no accented letters; training drew them with Aileron
+    assert not text_images.has_glyph(font, "é")
+    assert text_images.has_glyph(aileron, "é") and text_images.has_glyph(aileron, "Ã")
+    runs = text_images.font_runs("PÃO Café", [font, aileron, dejavu])
+    assert runs == [("P", font), ("Ã", aileron), ("O Caf", font), ("é", aileron)]
+    # a character Aileron lacks goes to DejaVu; one no font has stays with the built-in font (its notdef box)
+    assert text_images.font_runs("Ж", [font, aileron, dejavu]) == [("Ж", dejavu)]
+    assert text_images.font_runs("中", [font, aileron, dejavu]) == [("中", font)]
+
+
+def test_accented_picture_has_no_notdef_box():
+    # the built-in font alone draws "é" as its notdef box; with the fallback it is a real glyph, so the picture of
+    # "é" differs from the picture of an unknown character
+    accented = text_images.draw_text_image("Café")
+    unknown = text_images.draw_one_font(["Caf￾"], text_images.default_font())
+    assert accented.size != unknown.size or list(accented.getdata()) != list(unknown.getdata())
 
 
 def test_qwen_grid_and_thumbnail():

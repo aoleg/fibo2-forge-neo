@@ -55,6 +55,17 @@ def test_text_render_packs_two_phases(engine):
     assert cond[: len(early), -1].eq(1).all() and cond[len(early):, -1].eq(2).all()
 
 
+def test_caption_stripped_by_dynamic_prompts_reads_the_same(engine):
+    _, te = engine
+    prompt = json.dumps({"short_description": "A sign", "lighting": {"conditions": "dusk"},
+                         "text_render": [{"text": "OPEN"}]}, indent=2)
+    whole = te([prompt])[0]
+    stripped = te([prompt.replace("{", "").replace("}", "")])[0]
+    calls = [[t if isinstance(t, int) else "picture" for t in call] for call in te.text_encoder.calls]
+    assert calls[0] == calls[2] and calls[1] == calls[3] and "picture" in calls[0]
+    assert torch.equal(whole, stripped)
+
+
 def test_edit_images_go_first_and_negative_stays_text(engine):
     _, te = engine
     images = [torch.rand(1, 64, 96, 3), torch.rand(1, 1000, 800, 3)]

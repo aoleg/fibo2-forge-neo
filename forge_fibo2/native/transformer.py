@@ -100,12 +100,19 @@ class RMSNorm(nn.Module):
         self.eps = eps
         # torch.ones, not empty: the checkpoint overwrites it
         self.weight = nn.Parameter(torch.ones(dim))
+        # Forge's on-the-fly LoRA (GGUF models, low VRAM) hangs the patches of a module's weight here, as on its own
+        # operations (backend.operations.ForgeWeights), and the module applies them; one list per norm
+        self.weight_function = []
+        self.bias_function = []
 
     def forward(self, x):
         """RMS norm in float32, returned in float32."""
         x = x.float()
         x = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-        return x * kernels.cast_to(self.weight, torch.float32, x.device)
+        weight = kernels.cast_to(self.weight, torch.float32, x.device)
+        for patch in self.weight_function:
+            weight = patch(weight)
+        return x * weight
 
 
 class FeedForward(nn.Module):
